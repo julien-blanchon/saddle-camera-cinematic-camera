@@ -1,8 +1,8 @@
 use saddle_camera_cinematic_camera_example_common as common;
 
 use bevy::prelude::*;
-use saddle_camera_cinematic_camera::*;
 use common::DemoRig;
+use saddle_camera_cinematic_camera::*;
 
 fn main() {
     let mut app = App::new();
