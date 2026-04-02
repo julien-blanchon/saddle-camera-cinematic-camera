@@ -1,0 +1,13 @@
+[package]
+name = "saddle-camera-cinematic-camera-example-blend-between-shots"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+bevy = { workspace = true }
+saddle-camera-cinematic-camera = { workspace = true }
+saddle-camera-cinematic-camera-example-common = { path = "../common" }
+
+[lints]
+workspace = true

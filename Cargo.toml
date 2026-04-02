@@ -1,0 +1,17 @@
+[package]
+name = "saddle-camera-cinematic-camera"
+version = "0.1.0"
+edition = "2024"
+publish = false
+repository = "https://github.com/julien-blanchon/saddle-camera-cinematic-camera"
+license = "MIT-0"
+
+[dependencies]
+bevy = "0.18"
+
+[workspace]
+
+[lints.clippy]
+too_many_arguments = "allow"
+type_complexity = "allow"
+nonstandard_macro_braces = "warn"
