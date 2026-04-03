@@ -1,5 +1,5 @@
 [package]
-name = "saddle-camera-cinematic-camera-example-basic"
+name = "saddle-camera-cinematic-camera-example-virtual-camera-brain"
 version = "0.1.0"
 edition = "2024"
 publish = false

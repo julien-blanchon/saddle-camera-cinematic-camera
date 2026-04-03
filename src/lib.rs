@@ -8,10 +8,10 @@ mod solver;
 mod systems;
 
 pub use components::{
-    CinematicCameraBinding, CinematicCameraRig, CinematicCameraState, CinematicDrivenCamera,
-    CinematicPlayback, CinematicPlaybackStatus, CinematicSequence, CinematicShot,
-    CinematicTargetGroup, LensTrack, LookAtTarget, OrientationTrack, PathTangentOrientation,
-    PositionTrack, RailTrack, WeightedTarget,
+    CinematicCameraBinding, CinematicCameraBrain, CinematicCameraRig, CinematicCameraState,
+    CinematicDrivenCamera, CinematicPlayback, CinematicPlaybackStatus, CinematicSequence,
+    CinematicShot, CinematicTargetGroup, CinematicVirtualCamera, LensTrack, LookAtTarget,
+    OrientationTrack, PathTangentOrientation, PositionTrack, RailTrack, WeightedTarget,
 };
 pub use config::{
     CinematicBlend, CinematicEasing, MarkerTime, PlaybackLoopMode, ProceduralShake, ShotMarker,
@@ -92,10 +92,12 @@ impl Plugin for CinematicCameraPlugin {
             .add_message::<CinematicBlendCompleted>()
             .register_type::<CinematicBlend>()
             .register_type::<CinematicCameraBinding>()
+            .register_type::<CinematicCameraBrain>()
             .register_type::<CinematicCameraDebugSettings>()
             .register_type::<CinematicCameraDiagnostics>()
             .register_type::<CinematicCameraRig>()
             .register_type::<CinematicCameraState>()
+            .register_type::<CinematicVirtualCamera>()
             .register_type::<CinematicDrivenCamera>()
             .register_type::<CinematicEasing>()
             .register_type::<CinematicPlayback>()
@@ -136,6 +138,7 @@ impl Plugin for CinematicCameraPlugin {
                 self.update_schedule,
                 (
                     (
+                        systems::sync_virtual_camera_authoring,
                         systems::ensure_runtime_components,
                         systems::rebuild_sequence_caches,
                         systems::refresh_target_history,

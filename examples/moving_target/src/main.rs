@@ -67,27 +67,43 @@ fn setup(
         end_fov_y_radians: 0.65,
         easing: CinematicEasing::SineInOut,
     };
+    let rig = CinematicCameraRig {
+        auto_play: true,
+        enabled: true,
+    };
+    let sequence = CinematicSequence {
+        shots: vec![tracking],
+        loop_mode: PlaybackLoopMode::Loop,
+        entry_blend: CinematicBlend {
+            duration_secs: 0.8,
+            easing: CinematicEasing::SmoothStep,
+        },
+        ..default()
+    };
 
     commands.spawn((
         Name::new("Moving Target Rig"),
         DemoRig,
-        CinematicCameraRig {
-            auto_play: true,
-            enabled: true,
-        },
+        rig.clone(),
         CinematicCameraBinding {
             camera,
             ..default()
         },
         CinematicPlayback::default(),
-        CinematicSequence {
-            shots: vec![tracking],
-            loop_mode: PlaybackLoopMode::Loop,
-            entry_blend: CinematicBlend {
-                duration_secs: 0.8,
-                easing: CinematicEasing::SmoothStep,
-            },
-            ..default()
-        },
+        sequence.clone(),
     ));
+    common::queue_example_pane(
+        &mut commands,
+        common::ExampleCinematicPane::from_setup(
+            rig.enabled,
+            rig.auto_play,
+            1.0,
+            sequence.entry_blend.duration_secs,
+            sequence.exit_blend.duration_secs,
+            &CinematicCameraDebugSettings {
+                enabled: true,
+                ..default()
+            },
+        ),
+    );
 }

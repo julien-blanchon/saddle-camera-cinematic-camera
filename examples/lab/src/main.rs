@@ -1,3 +1,8 @@
+#[cfg(feature = "e2e")]
+mod e2e;
+
+use saddle_camera_cinematic_camera_example_common as common;
+
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 use saddle_camera_cinematic_camera::*;
 
@@ -22,11 +27,10 @@ struct LabHandles {
 fn main() {
     let mut app = App::new();
     app.add_plugins(DefaultPlugins);
-    app.insert_resource(CinematicCameraDebugSettings {
-        enabled: true,
-        ..default()
-    });
     app.add_plugins(CinematicCameraPlugin::always_on(Update));
+    common::install_common(&mut app, "Cinematic Lab");
+    #[cfg(feature = "e2e")]
+    app.add_plugins(e2e::CinematicCameraLabE2EPlugin);
     app.add_systems(Startup, setup);
     app.add_systems(
         Update,
@@ -110,6 +114,7 @@ fn setup(
     let camera = commands
         .spawn((
             Name::new("Lab Camera"),
+            CinematicCameraBrain,
             Camera3d::default(),
             Projection::Perspective(PerspectiveProjection {
                 fov: 0.9,
@@ -181,36 +186,55 @@ fn setup(
         },
         ..default()
     };
+    let rig_settings = CinematicCameraRig {
+        auto_play: true,
+        enabled: true,
+    };
+    let sequence = CinematicSequence {
+        shots: vec![opening, push, close_up],
+        restore_camera_on_finish: true,
+        entry_blend: CinematicBlend {
+            duration_secs: 0.8,
+            easing: CinematicEasing::CubicInOut,
+        },
+        exit_blend: CinematicBlend {
+            duration_secs: 0.9,
+            easing: CinematicEasing::SineInOut,
+        },
+        ..default()
+    };
 
     let rig = commands
         .spawn((
             Name::new("Cinematic Lab Rig"),
-            CinematicCameraRig {
-                auto_play: true,
-                enabled: true,
-            },
-            CinematicCameraBinding {
-                camera,
+            common::DemoRig,
+            CinematicVirtualCamera {
+                brain: camera,
+                priority: 20,
+                live: rig_settings.enabled,
+                auto_play: rig_settings.auto_play,
                 ..default()
             },
             CinematicPlayback::default(),
-            CinematicSequence {
-                shots: vec![opening, push, close_up],
-                restore_camera_on_finish: true,
-                entry_blend: CinematicBlend {
-                    duration_secs: 0.8,
-                    easing: CinematicEasing::CubicInOut,
-                },
-                exit_blend: CinematicBlend {
-                    duration_secs: 0.9,
-                    easing: CinematicEasing::SineInOut,
-                },
-                ..default()
-            },
+            sequence.clone(),
         ))
         .id();
 
     commands.insert_resource(LabHandles { rig, camera });
+    common::queue_example_pane(
+        &mut commands,
+        common::ExampleCinematicPane::from_setup(
+            rig_settings.enabled,
+            rig_settings.auto_play,
+            1.0,
+            sequence.entry_blend.duration_secs,
+            sequence.exit_blend.duration_secs,
+            &CinematicCameraDebugSettings {
+                enabled: true,
+                ..default()
+            },
+        ),
+    );
 
     commands.spawn((
         Name::new("Cinematic Camera Lab Overlay"),

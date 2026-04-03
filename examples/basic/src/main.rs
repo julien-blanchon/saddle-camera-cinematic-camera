@@ -50,27 +50,43 @@ fn setup(
         end_fov_y_radians: 0.95,
         easing: CinematicEasing::SineInOut,
     };
+    let rig = CinematicCameraRig {
+        auto_play: true,
+        enabled: true,
+    };
+    let sequence = CinematicSequence {
+        shots: vec![flythrough],
+        loop_mode: PlaybackLoopMode::Loop,
+        entry_blend: CinematicBlend {
+            duration_secs: 1.5,
+            easing: CinematicEasing::SineInOut,
+        },
+        ..default()
+    };
 
     commands.spawn((
         Name::new("Basic Flythrough Rig"),
         DemoRig,
-        CinematicCameraRig {
-            auto_play: true,
-            enabled: true,
-        },
+        rig.clone(),
         CinematicCameraBinding {
             camera,
             ..default()
         },
         CinematicPlayback::default(),
-        CinematicSequence {
-            shots: vec![flythrough],
-            loop_mode: PlaybackLoopMode::Loop,
-            entry_blend: CinematicBlend {
-                duration_secs: 1.5,
-                easing: CinematicEasing::SineInOut,
-            },
-            ..default()
-        },
+        sequence.clone(),
     ));
+    common::queue_example_pane(
+        &mut commands,
+        common::ExampleCinematicPane::from_setup(
+            rig.enabled,
+            rig.auto_play,
+            1.0,
+            sequence.entry_blend.duration_secs,
+            sequence.exit_blend.duration_secs,
+            &CinematicCameraDebugSettings {
+                enabled: true,
+                ..default()
+            },
+        ),
+    );
 }

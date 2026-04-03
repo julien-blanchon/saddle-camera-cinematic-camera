@@ -4,9 +4,15 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
+[features]
+e2e = ["dep:saddle-bevy-e2e"]
+
 [dependencies]
 bevy = { workspace = true }
+saddle-bevy-e2e = { git = "https://github.com/julien-blanchon/saddle-bevy-e2e", features = ["json"], optional = true }
 saddle-camera-cinematic-camera = { workspace = true }
+saddle-camera-cinematic-camera-example-common = { path = "../common" }
+saddle-pane = { git = "https://github.com/julien-blanchon/saddle-pane" }
 
 [lints]
 workspace = true

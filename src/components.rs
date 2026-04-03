@@ -23,6 +23,38 @@ impl Default for CinematicCameraRig {
 
 #[derive(Component, Clone, Debug, Reflect)]
 #[reflect(Component)]
+pub struct CinematicVirtualCamera {
+    pub brain: Entity,
+    pub priority: i32,
+    pub live: bool,
+    pub solo: bool,
+    pub auto_play: bool,
+    pub capture_gameplay_state: bool,
+    pub apply_transform: bool,
+    pub apply_projection: bool,
+}
+
+impl Default for CinematicVirtualCamera {
+    fn default() -> Self {
+        Self {
+            brain: Entity::PLACEHOLDER,
+            priority: 0,
+            live: true,
+            solo: false,
+            auto_play: false,
+            capture_gameplay_state: true,
+            apply_transform: true,
+            apply_projection: true,
+        }
+    }
+}
+
+#[derive(Component, Clone, Copy, Debug, Reflect, Default, PartialEq, Eq)]
+#[reflect(Component)]
+pub struct CinematicCameraBrain;
+
+#[derive(Component, Clone, Debug, Reflect)]
+#[reflect(Component)]
 pub struct CinematicCameraBinding {
     pub camera: Entity,
     pub priority: i32,

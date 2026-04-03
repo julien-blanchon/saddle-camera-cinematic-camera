@@ -104,31 +104,47 @@ fn setup(
         },
         ..default()
     };
+    let rig = CinematicCameraRig {
+        auto_play: true,
+        enabled: true,
+    };
+    let sequence = CinematicSequence {
+        shots: vec![opening, push_in, close_up],
+        restore_camera_on_finish: true,
+        entry_blend: CinematicBlend {
+            duration_secs: 1.0,
+            easing: CinematicEasing::CubicInOut,
+        },
+        exit_blend: CinematicBlend {
+            duration_secs: 1.0,
+            easing: CinematicEasing::SineInOut,
+        },
+        ..default()
+    };
 
     commands.spawn((
         Name::new("Blend Showcase Rig"),
         DemoRig,
-        CinematicCameraRig {
-            auto_play: true,
-            enabled: true,
-        },
+        rig.clone(),
         CinematicCameraBinding {
             camera,
             ..default()
         },
         CinematicPlayback::default(),
-        CinematicSequence {
-            shots: vec![opening, push_in, close_up],
-            restore_camera_on_finish: true,
-            entry_blend: CinematicBlend {
-                duration_secs: 1.0,
-                easing: CinematicEasing::CubicInOut,
-            },
-            exit_blend: CinematicBlend {
-                duration_secs: 1.0,
-                easing: CinematicEasing::SineInOut,
-            },
-            ..default()
-        },
+        sequence.clone(),
     ));
+    common::queue_example_pane(
+        &mut commands,
+        common::ExampleCinematicPane::from_setup(
+            rig.enabled,
+            rig.auto_play,
+            1.0,
+            sequence.entry_blend.duration_secs,
+            sequence.exit_blend.duration_secs,
+            &CinematicCameraDebugSettings {
+                enabled: true,
+                ..default()
+            },
+        ),
+    );
 }

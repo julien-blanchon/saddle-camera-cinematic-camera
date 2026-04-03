@@ -1,5 +1,5 @@
 [package]
-name = "saddle-camera-cinematic-camera-example-basic"
+name = "saddle-camera-cinematic-camera-example-cinematic-orbit-handoff"
 version = "0.1.0"
 edition = "2024"
 publish = false
@@ -8,6 +8,7 @@ publish = false
 bevy = { workspace = true }
 saddle-camera-cinematic-camera = { workspace = true }
 saddle-camera-cinematic-camera-example-common = { path = "../common" }
+saddle-camera-orbit-camera = { git = "https://github.com/julien-blanchon/saddle-camera-orbit-camera" }
 saddle-pane = { git = "https://github.com/julien-blanchon/saddle-pane" }
 
 [lints]

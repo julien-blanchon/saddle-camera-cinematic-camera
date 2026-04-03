@@ -15,10 +15,17 @@ Working
 ## Run
 
 ```bash
-cargo run -p cinematic_camera_lab
+cargo run -p saddle-camera-cinematic-camera-lab
+```
+
+## E2E
+
+```bash
+cargo run -p saddle-camera-cinematic-camera-lab --features e2e -- smoke_launch
+cargo run -p saddle-camera-cinematic-camera-lab --features e2e -- cinematic_camera_virtual_camera
 ```
 
 ## Notes
 
 - Press `Space` to restart the reveal sequence.
-- The lab keeps the scene generic: one moving subject, one gameplay camera, one cinematic rig, and a short blend-in / blend-out sequence.
+- The lab now exercises the explicit `CinematicVirtualCamera` + `CinematicCameraBrain` authoring path rather than only the lower-level binding components.

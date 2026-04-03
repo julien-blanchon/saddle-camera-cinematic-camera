@@ -3,10 +3,12 @@ members = [
     "common",
     "basic",
     "blend_between_shots",
+    "cinematic_orbit_handoff",
     "moving_target",
     "target_group",
     "handheld_rail",
     "stress_preview",
+    "virtual_camera_brain",
     "lab",
 ]
 resolver = "3"

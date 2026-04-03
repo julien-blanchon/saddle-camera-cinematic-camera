@@ -14,6 +14,7 @@ Messages / component edits
         |
         v
 InputOrCommands
+  - sync `CinematicVirtualCamera` authoring into rig/binding data
   - ensure runtime components exist
   - rebuild sequence caches on Changed<CinematicSequence>
   - precompute timeline lifecycle events on Changed<CinematicSequence>
@@ -95,6 +96,8 @@ The runtime therefore never needs to “own the whole camera stack”. It only n
 - its own solved pose
 
 `CinematicDrivenCamera` on the target camera makes ownership explicit for UI, debug tools, BRP queries, and higher-level orchestration.
+
+`CinematicVirtualCamera` is a thin authoring layer on top of that runtime model. It syncs a more Cinemachine-like “virtual camera targets a brain camera” vocabulary into the existing `CinematicCameraRig` + `CinematicCameraBinding` components, so gameplay code can toggle `live` or `solo` without bypassing the tested playback path.
 
 ## Debug Surface
 

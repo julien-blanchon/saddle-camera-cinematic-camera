@@ -9,6 +9,21 @@ This is the tuning reference for `saddle-camera-cinematic-camera`.
 | `auto_play` | `bool` | `false` | Starts playback automatically the first time the runtime sees the rig while active. |
 | `enabled` | `bool` | `true` | Master per-rig toggle. Disabled rigs keep their data but no longer drive cameras. |
 
+## `CinematicVirtualCamera`
+
+| Field | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `brain` | `Entity` | `Entity::PLACEHOLDER` | Camera entity that should receive this virtual camera's solved output. |
+| `priority` | `i32` | `0` | Higher priority wins when several virtual cameras target the same brain. |
+| `live` | `bool` | `true` | Mirrors into `CinematicCameraRig.enabled`. Toggle this from gameplay state logic. |
+| `solo` | `bool` | `false` | Temporarily boosts priority so one virtual camera wins over its siblings. |
+| `auto_play` | `bool` | `false` | Mirrors into `CinematicCameraRig.auto_play`. |
+| `capture_gameplay_state` | `bool` | `true` | Mirrors into `CinematicCameraBinding.capture_gameplay_state`. |
+| `apply_transform` | `bool` | `true` | Mirrors into `CinematicCameraBinding.apply_transform`. |
+| `apply_projection` | `bool` | `true` | Mirrors into `CinematicCameraBinding.apply_projection`. |
+
+Attach `CinematicVirtualCamera` plus `CinematicSequence` to the same entity when you want an explicit virtual-camera authoring surface. The runtime will populate or refresh `CinematicCameraRig` and `CinematicCameraBinding` for you.
+
 ## `CinematicCameraBinding`
 
 | Field | Type | Default | Notes |

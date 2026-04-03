@@ -10,7 +10,7 @@ use crate::{
     CinematicBlend, CinematicBlendCompleted, CinematicBlendKind, CinematicCameraBinding,
     CinematicCameraPlugin, CinematicCameraRig, CinematicDrivenCamera, CinematicPlayback,
     CinematicPlaybackCommand, CinematicPlaybackStatus, CinematicSequence, CinematicShot,
-    MarkerTime, ShotMarker, ShotMarkerReached, ShotStarted,
+    CinematicVirtualCamera, MarkerTime, ShotMarker, ShotMarkerReached, ShotStarted,
 };
 
 fn test_app() -> App {
@@ -56,6 +56,44 @@ fn autoplay_advances_sequence_time() {
 
     let playback = app.world().entity(rig).get::<CinematicPlayback>().unwrap();
     assert!(playback.elapsed_secs > 0.0);
+}
+
+#[test]
+fn virtual_camera_authoring_creates_runtime_rig_and_binding() {
+    let mut app = test_app();
+    let camera = app
+        .world_mut()
+        .spawn((Transform::default(), Projection::Perspective(PerspectiveProjection::default())))
+        .id();
+    let rig = app
+        .world_mut()
+        .spawn((
+            CinematicVirtualCamera {
+                brain: camera,
+                priority: 7,
+                live: true,
+                auto_play: false,
+                ..default()
+            },
+            CinematicPlayback::default(),
+            CinematicSequence {
+                shots: vec![CinematicShot::fixed("A", 1.0, Vec3::ZERO, Quat::IDENTITY)],
+                ..default()
+            },
+        ))
+        .id();
+
+    app.update();
+
+    let rig_component = app.world().entity(rig).get::<CinematicCameraRig>().unwrap();
+    let binding = app
+        .world()
+        .entity(rig)
+        .get::<CinematicCameraBinding>()
+        .unwrap();
+    assert!(rig_component.enabled);
+    assert_eq!(binding.camera, camera);
+    assert_eq!(binding.priority, 7);
 }
 
 #[test]

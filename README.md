@@ -2,6 +2,8 @@
 
 Reusable cinematic camera toolkit for Bevy: authored rails, weighted look targets, shot sequencing, per-shot blends, and clean gameplay-camera handoff.
 
+The runtime now also exposes an explicit `CinematicVirtualCamera` authoring component that syncs into the underlying rig/binding system, giving downstream games a clearer “virtual camera + brain” vocabulary on top of the existing solver.
+
 The crate stays project-agnostic. It does not depend on `game_core`, `Screen`, `GameSet`, or any game-specific vocabulary. Consumers wire it into their own schedules and bind it to any Bevy camera entity they already own.
 
 For always-on examples, tools, or sandboxes, `CinematicCameraPlugin::always_on(Update)` is the simplest entrypoint. For real games, prefer `CinematicCameraPlugin::new(...)` so activation and teardown stay aligned with your own state flow.
@@ -99,6 +101,8 @@ fn setup(mut commands: Commands) {
 | --- | --- |
 | `CinematicCameraPlugin` | Registers the cinematic runtime with injectable activate, deactivate, and update schedules |
 | `CinematicCameraSystems` | Public ordering hooks: `InputOrCommands`, `AdvanceTimeline`, `SolveRig`, `ApplyCamera`, `Debug` |
+| `CinematicVirtualCamera` | Authoring-facing virtual-camera surface that syncs into rig/binding data |
+| `CinematicCameraBrain` | Optional marker for a gameplay camera that receives virtual-camera output |
 | `CinematicCameraRig` | Per-rig runtime toggle and optional autoplay flag |
 | `CinematicCameraBinding` | Binds a rig to a concrete Bevy camera entity and controls transform / projection writeback |
 | `CinematicSequence` | Sequence of authored `CinematicShot`s, plus entry/exit blends and sequence loop policy |
@@ -149,10 +153,14 @@ Sequence data is cached on `Changed<CinematicSequence>`. The solver operates on 
 | --- | --- | --- |
 | `basic` | Minimal looped flythrough on a closed rail | `cargo run -p saddle-camera-cinematic-camera-example-basic` |
 | `blend_between_shots` | Gameplay-camera handoff, shot-to-shot blends, and clean return | `cargo run -p saddle-camera-cinematic-camera-example-blend-between-shots` |
+| `cinematic_orbit_handoff` | Cross-crate demo: cinematic intro that hands off into an orbit-camera model viewer | `cargo run -p saddle-camera-cinematic-camera-example-cinematic-orbit-handoff` |
 | `moving_target` | Rail-driven camera that tracks a moving entity with look-ahead | `cargo run -p saddle-camera-cinematic-camera-example-moving-target` |
 | `target_group` | Weighted target-group framing over two moving subjects | `cargo run -p saddle-camera-cinematic-camera-example-target-group` |
 | `handheld_rail` | Rail motion with deterministic additive handheld shake | `cargo run -p saddle-camera-cinematic-camera-example-handheld-rail` |
 | `stress_preview` | One active rig plus 100 passive preview rigs for perf smoke | `cargo run -p saddle-camera-cinematic-camera-example-stress-preview` |
+| `virtual_camera_brain` | Two authored virtual cameras hand off through a shared brain camera | `cargo run -p saddle-camera-cinematic-camera-example-virtual-camera-brain` |
+
+All showcase examples now include a `saddle-pane` panel for live tuning of playback speed, rig enablement, blend durations, and debug draw toggles.
 
 ## Workspace Lab
 

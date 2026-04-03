@@ -1,8 +1,48 @@
 use bevy::prelude::*;
+use bevy_flair::prelude::InlineStyle;
 use saddle_camera_cinematic_camera::{
-    CinematicCameraDebugSettings, CinematicCameraDiagnostics, CinematicCameraState,
-    CinematicPlayback, CinematicTargetGroup, UpVectorMode, WeightedTarget,
+    CinematicCameraDebugSettings, CinematicCameraDiagnostics, CinematicCameraRig,
+    CinematicCameraState, CinematicCameraSystems, CinematicPlayback, CinematicSequence,
+    CinematicTargetGroup, CinematicVirtualCamera, UpVectorMode, WeightedTarget,
 };
+use saddle_pane::prelude::*;
+
+const PANE_DARK_THEME_VARS: &[(&str, &str)] = &[
+    ("--pane-elevation-1", "#28292e"),
+    ("--pane-elevation-2", "#222327"),
+    ("--pane-elevation-3", "rgba(187, 188, 196, 0.10)"),
+    ("--pane-border", "#3c3d44"),
+    ("--pane-border-focus", "#7090b0"),
+    ("--pane-border-subtle", "#333438"),
+    ("--pane-text-primary", "#bbbcc4"),
+    ("--pane-text-secondary", "#78797f"),
+    ("--pane-text-muted", "#5c5d64"),
+    ("--pane-text-on-accent", "#ffffff"),
+    ("--pane-text-brighter", "#d0d1d8"),
+    ("--pane-text-monitor", "#9a9ba2"),
+    ("--pane-text-log", "#8a8b92"),
+    ("--pane-accent", "#4a6fa5"),
+    ("--pane-accent-hover", "#5a8fd5"),
+    ("--pane-accent-active", "#3a5f95"),
+    ("--pane-accent-subtle", "rgba(74, 111, 165, 0.15)"),
+    ("--pane-accent-fill", "rgba(74, 111, 165, 0.60)"),
+    ("--pane-accent-fill-hover", "rgba(90, 143, 213, 0.70)"),
+    ("--pane-accent-fill-active", "rgba(90, 143, 213, 0.80)"),
+    ("--pane-accent-checked", "rgba(74, 111, 165, 0.25)"),
+    ("--pane-accent-checked-hover", "rgba(74, 111, 165, 0.35)"),
+    ("--pane-accent-indicator", "rgba(74, 111, 165, 0.80)"),
+    ("--pane-accent-knob", "#7aacdf"),
+    ("--pane-widget-bg", "rgba(187, 188, 196, 0.10)"),
+    ("--pane-widget-hover", "rgba(187, 188, 196, 0.15)"),
+    ("--pane-widget-focus", "rgba(187, 188, 196, 0.20)"),
+    ("--pane-widget-active", "rgba(187, 188, 196, 0.25)"),
+    ("--pane-widget-bg-muted", "rgba(187, 188, 196, 0.06)"),
+    ("--pane-tab-hover-bg", "rgba(187, 188, 196, 0.06)"),
+    ("--pane-hover-bg", "rgba(255, 255, 255, 0.03)"),
+    ("--pane-active-bg", "rgba(255, 255, 255, 0.05)"),
+    ("--pane-popup-bg", "#1e1f24"),
+    ("--pane-bg-dark", "rgba(0, 0, 0, 0.25)"),
+];
 
 #[derive(Component)]
 pub struct DemoRig;
@@ -30,13 +70,136 @@ pub struct BobbingProp {
 #[derive(Resource)]
 pub struct OverlayTitle(pub &'static str);
 
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Pane)]
+#[pane(title = "Cinematic Camera", position = "top-right")]
+pub struct ExampleCinematicPane {
+    #[pane(toggle)]
+    pub rig_enabled: bool,
+    #[pane(toggle)]
+    pub auto_play: bool,
+    #[pane(toggle)]
+    pub debug_gizmos: bool,
+    #[pane(toggle)]
+    pub draw_paths: bool,
+    #[pane(toggle)]
+    pub draw_targets: bool,
+    #[pane(slider, min = 0.1, max = 3.0, step = 0.05)]
+    pub playback_speed: f32,
+    #[pane(slider, min = 0.0, max = 3.0, step = 0.05)]
+    pub entry_blend_secs: f32,
+    #[pane(slider, min = 0.0, max = 3.0, step = 0.05)]
+    pub exit_blend_secs: f32,
+    #[pane(monitor)]
+    pub active_rigs: f32,
+    #[pane(monitor)]
+    pub applied_cameras: f32,
+    #[pane(monitor)]
+    pub sequence_time_secs: f32,
+}
+
+impl Default for ExampleCinematicPane {
+    fn default() -> Self {
+        Self {
+            rig_enabled: true,
+            auto_play: true,
+            debug_gizmos: true,
+            draw_paths: true,
+            draw_targets: true,
+            playback_speed: 1.0,
+            entry_blend_secs: 0.8,
+            exit_blend_secs: 0.8,
+            active_rigs: 0.0,
+            applied_cameras: 0.0,
+            sequence_time_secs: 0.0,
+        }
+    }
+}
+
+impl ExampleCinematicPane {
+    pub fn from_setup(
+        rig_enabled: bool,
+        auto_play: bool,
+        playback_speed: f32,
+        entry_blend_secs: f32,
+        exit_blend_secs: f32,
+        debug: &CinematicCameraDebugSettings,
+    ) -> Self {
+        Self {
+            rig_enabled,
+            auto_play,
+            debug_gizmos: debug.enabled,
+            draw_paths: debug.draw_paths,
+            draw_targets: debug.draw_targets,
+            playback_speed,
+            entry_blend_secs,
+            exit_blend_secs,
+            active_rigs: 0.0,
+            applied_cameras: 0.0,
+            sequence_time_secs: 0.0,
+        }
+    }
+}
+
+#[derive(Resource, Clone, Copy)]
+struct ExampleCinematicPaneBootstrap(ExampleCinematicPane);
+
+pub fn queue_example_pane(commands: &mut Commands, pane: ExampleCinematicPane) {
+    commands.insert_resource(ExampleCinematicPaneBootstrap(pane));
+}
+
 pub fn install_common(app: &mut App, title: &'static str) {
     app.insert_resource(OverlayTitle(title));
     app.insert_resource(CinematicCameraDebugSettings {
         enabled: true,
         ..default()
     });
-    app.add_systems(Update, (animate_orbits, animate_bobbing, update_overlay));
+    app.add_plugins((
+        bevy_flair::FlairPlugin,
+        bevy_input_focus::InputDispatchPlugin,
+        bevy_ui_widgets::UiWidgetsPlugins,
+        bevy_input_focus::tab_navigation::TabNavigationPlugin,
+        PanePlugin,
+    ))
+    .register_pane::<ExampleCinematicPane>()
+    .add_systems(
+        PreUpdate,
+        (
+            prime_pane_theme_vars,
+            apply_bootstrapped_pane,
+            sync_example_pane,
+        )
+            .chain(),
+    )
+    .add_systems(
+        Update,
+        (
+            animate_orbits,
+            animate_bobbing,
+            reflect_runtime_into_pane.after(CinematicCameraSystems::ApplyCamera),
+            update_overlay,
+        ),
+    );
+}
+
+fn prime_pane_theme_vars(mut panes: Query<&mut InlineStyle, Added<PaneRoot>>) {
+    for mut style in &mut panes {
+        for &(key, value) in PANE_DARK_THEME_VARS {
+            style.set(key, value.to_owned());
+        }
+    }
+}
+
+fn apply_bootstrapped_pane(
+    bootstrap: Option<Res<ExampleCinematicPaneBootstrap>>,
+    mut pane: ResMut<ExampleCinematicPane>,
+) {
+    let Some(bootstrap) = bootstrap else {
+        return;
+    };
+
+    if *pane == ExampleCinematicPane::default() {
+        *pane = bootstrap.0;
+    }
 }
 
 pub fn spawn_demo_scene(
@@ -225,4 +388,63 @@ fn update_overlay(
         .unwrap_or_else(|| title.0.to_string());
 
     *text = Text::new(body);
+}
+
+fn sync_example_pane(
+    mut pane: ResMut<ExampleCinematicPane>,
+    bootstrap: Option<Res<ExampleCinematicPaneBootstrap>>,
+    mut debug: ResMut<CinematicCameraDebugSettings>,
+    mut rigs: Query<
+        (
+            &mut CinematicCameraRig,
+            &mut CinematicPlayback,
+            &mut CinematicSequence,
+        ),
+        Or<(With<DemoRig>, With<CinematicVirtualCamera>)>,
+    >,
+) {
+    let has_bootstrap = bootstrap.is_some();
+    if let Some(bootstrap) = bootstrap {
+        if *pane == ExampleCinematicPane::default() && bootstrap.0 != *pane {
+            *pane = bootstrap.0;
+        }
+    }
+
+    for (mut rig, mut playback, mut sequence) in &mut rigs {
+        let scene_pane = ExampleCinematicPane::from_setup(
+            rig.enabled,
+            rig.auto_play,
+            playback.speed,
+            sequence.entry_blend.duration_secs,
+            sequence.exit_blend.duration_secs,
+            &debug,
+        );
+        if !has_bootstrap && *pane == ExampleCinematicPane::default() && scene_pane != *pane {
+            *pane = scene_pane;
+            return;
+        }
+
+        debug.enabled = pane.debug_gizmos;
+        debug.draw_paths = pane.draw_paths;
+        debug.draw_targets = pane.draw_targets;
+        rig.enabled = pane.rig_enabled;
+        rig.auto_play = pane.auto_play;
+        playback.speed = pane.playback_speed.max(0.05);
+        sequence.entry_blend.duration_secs = pane.entry_blend_secs.max(0.0);
+        sequence.exit_blend.duration_secs = pane.exit_blend_secs.max(0.0);
+    }
+}
+
+fn reflect_runtime_into_pane(
+    diagnostics: Res<CinematicCameraDiagnostics>,
+    states: Query<&CinematicCameraState, With<DemoRig>>,
+    mut pane: ResMut<ExampleCinematicPane>,
+) {
+    pane.active_rigs = diagnostics.active_rigs as f32;
+    pane.applied_cameras = diagnostics.applied_cameras as f32;
+    pane.sequence_time_secs = states
+        .iter()
+        .next()
+        .map(|state| state.sequence_time_secs)
+        .unwrap_or(0.0);
 }

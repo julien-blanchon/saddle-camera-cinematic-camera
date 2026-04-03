@@ -7,9 +7,9 @@ use crate::{
     CinematicBlendCompleted, CinematicBlendKind, CinematicCameraBinding,
     CinematicCameraDiagnostics, CinematicCameraRig, CinematicCameraState, CinematicDrivenCamera,
     CinematicPlayback, CinematicPlaybackCommand, CinematicPlaybackStatus, CinematicSequence,
-    CinematicShot, CinematicTargetGroup, LookAtTarget, OrientationTrack, PathTangentOrientation,
-    PlaybackLoopMode, PositionTrack, SequenceFinished, ShotFinished, ShotMarkerReached,
-    ShotStarted, UpVectorMode,
+    CinematicShot, CinematicTargetGroup, CinematicVirtualCamera, LookAtTarget,
+    OrientationTrack, PathTangentOrientation, PlaybackLoopMode, PositionTrack, SequenceFinished,
+    ShotFinished, ShotMarkerReached, ShotStarted, UpVectorMode,
     curve::CinematicRailCache,
     resources::{CinematicCameraRuntimeState, TargetHistory, TargetMotionState},
     solver::{self, SolvedCameraPose},
@@ -112,6 +112,53 @@ pub(crate) fn deactivate_runtime(
     runtime_state.active = false;
     for entity in &driven_cameras {
         commands.entity(entity).remove::<CinematicDrivenCamera>();
+    }
+}
+
+pub(crate) fn sync_virtual_camera_authoring(
+    mut commands: Commands,
+    mut query: Query<
+        (
+            Entity,
+            &CinematicVirtualCamera,
+            Option<&mut CinematicCameraRig>,
+            Option<&mut CinematicCameraBinding>,
+        ),
+        With<CinematicSequence>,
+    >,
+) {
+    for (entity, virtual_camera, rig, binding) in &mut query {
+        let resolved_priority = if virtual_camera.solo {
+            i32::MAX.saturating_sub(virtual_camera.priority.abs())
+        } else {
+            virtual_camera.priority
+        };
+
+        if let Some(mut rig) = rig {
+            rig.auto_play = virtual_camera.auto_play;
+            rig.enabled = virtual_camera.live;
+        } else {
+            commands.entity(entity).insert(CinematicCameraRig {
+                auto_play: virtual_camera.auto_play,
+                enabled: virtual_camera.live,
+            });
+        }
+
+        if let Some(mut binding) = binding {
+            binding.camera = virtual_camera.brain;
+            binding.priority = resolved_priority;
+            binding.capture_gameplay_state = virtual_camera.capture_gameplay_state;
+            binding.apply_transform = virtual_camera.apply_transform;
+            binding.apply_projection = virtual_camera.apply_projection;
+        } else {
+            commands.entity(entity).insert(CinematicCameraBinding {
+                camera: virtual_camera.brain,
+                priority: resolved_priority,
+                capture_gameplay_state: virtual_camera.capture_gameplay_state,
+                apply_transform: virtual_camera.apply_transform,
+                apply_projection: virtual_camera.apply_projection,
+            });
+        }
     }
 }
 
