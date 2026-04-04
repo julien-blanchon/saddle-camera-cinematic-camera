@@ -63,7 +63,10 @@ fn virtual_camera_authoring_creates_runtime_rig_and_binding() {
     let mut app = test_app();
     let camera = app
         .world_mut()
-        .spawn((Transform::default(), Projection::Perspective(PerspectiveProjection::default())))
+        .spawn((
+            Transform::default(),
+            Projection::Perspective(PerspectiveProjection::default()),
+        ))
         .id();
     let rig = app
         .world_mut()
