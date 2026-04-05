@@ -117,6 +117,8 @@ fn setup(
         },
         CinematicPlayback::default(),
         sequence.clone(),
+        // Heavy damping to smooth the rapidly-moving weighted centroid of two targets.
+        CinematicOutputDamping::heavy(),
     ));
     common::queue_example_pane(
         &mut commands,

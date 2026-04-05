@@ -28,16 +28,16 @@ fn setup(
         Color::srgb(0.18, 0.74, 0.68),
         OrbitTarget {
             center: Vec3::new(0.0, 0.0, 0.0),
-            radius: 8.0,
+            radius: 5.0,
             height: 1.6,
-            speed: 0.75,
+            speed: 0.55,
             phase: 1.3,
         },
     );
 
     let camera = common::spawn_camera(
         &mut commands,
-        Transform::from_xyz(-12.0, 4.0, 16.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_xyz(-8.0, 4.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
     );
 
     let mut tracking = CinematicShot::rail(
@@ -45,12 +45,12 @@ fn setup(
         10.0,
         CinematicRail {
             points: vec![
-                Vec3::new(-14.0, 5.0, 12.0),
-                Vec3::new(-4.0, 4.0, 14.0),
-                Vec3::new(7.0, 5.2, 10.0),
-                Vec3::new(14.0, 4.4, -4.0),
-                Vec3::new(4.0, 4.5, -12.0),
-                Vec3::new(-10.0, 5.5, -8.0),
+                Vec3::new(-10.0, 4.0, 8.0),
+                Vec3::new(-3.0, 3.5, 10.0),
+                Vec3::new(5.0, 4.2, 7.0),
+                Vec3::new(9.0, 3.8, -2.0),
+                Vec3::new(3.0, 4.0, -8.0),
+                Vec3::new(-7.0, 4.5, -5.0),
             ],
             closed: true,
             ..default()
@@ -60,7 +60,7 @@ fn setup(
         entity: subject,
         offset: Vec3::new(0.0, 0.5, 0.0),
         up: UpVectorMode::WorldY,
-        look_ahead_secs: 0.35,
+        look_ahead_secs: 0.15,
     });
     tracking.lens = LensTrack {
         start_fov_y_radians: 0.8,
@@ -91,6 +91,8 @@ fn setup(
         },
         CinematicPlayback::default(),
         sequence.clone(),
+        // Output damping smooths look-ahead tracking of the fast-moving target.
+        CinematicOutputDamping::default(),
     ));
     common::queue_example_pane(
         &mut commands,

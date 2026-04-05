@@ -122,6 +122,54 @@ Attach `CinematicVirtualCamera` plus `CinematicSequence` to the same entity when
 | `end_fov_y_radians` | `f32` | Bevy perspective default | End vertical FOV in radians. |
 | `easing` | `CinematicEasing` | `Linear` | Shapes FOV interpolation across the shot. |
 
+## Output Damping
+
+### `CinematicOutputDamping`
+
+| Field | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `position_rate` | `f32` | `20.0` | Exponential smoothing rate for position. Higher values track the raw solve more tightly. |
+| `rotation_rate` | `f32` | `15.0` | Exponential smoothing rate for rotation. Higher values track the raw solve more tightly. |
+
+Presets:
+
+| Preset | `position_rate` | `rotation_rate` | Use case |
+| --- | --- | --- | --- |
+| `default()` | `20.0` | `15.0` | General purpose smoothing |
+| `light()` | `30.0` | `25.0` | Subtle smoothing for fast-moving rigs |
+| `heavy()` | `8.0` | `6.0` | Heavy cinematic smoothing for slow, deliberate shots |
+
+Both rates use framerate-independent exponential smoothing: `factor = 1.0 - exp(-rate * dt)`.
+
+## Collision Avoidance
+
+### `CinematicCollisionAvoidance`
+
+| Field | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `policy` | `CollisionPolicy` | `PushCloser` | How the system responds to collisions. |
+| `padding` | `f32` | `0.3` | Minimum distance to keep from the collision surface (meters). |
+| `retract_rate` | `f32` | `20.0` | Exponential smoothing rate when pulling the camera closer (fast). |
+| `recover_rate` | `f32` | `4.0` | Exponential smoothing rate when moving the camera back out (slow). |
+| `min_distance` | `f32` | `0.5` | Minimum distance from the look target to the camera (meters). |
+
+### `CollisionPolicy`
+
+| Variant | Behavior |
+| --- | --- |
+| `PushCloser` | Move the camera closer to the look target to avoid the obstruction. |
+| `None` | Record collision data but do not modify the camera position. |
+
+Presets:
+
+| Preset | `padding` | `retract_rate` | `recover_rate` | `min_distance` |
+| --- | --- | --- | --- | --- |
+| `default()` | `0.3` | `20.0` | `4.0` | `0.5` |
+| `tight()` | `0.15` | `30.0` | `6.0` | `0.3` |
+| `loose()` | `0.6` | `12.0` | `3.0` | `0.8` |
+
+Collision avoidance requires `MeshPickingPlugin` to be added to the app. Without it, the collision system is not registered.
+
 ## Debug
 
 ### `CinematicCameraDebugSettings`

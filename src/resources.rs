@@ -45,9 +45,22 @@ pub(crate) struct CinematicCameraRuntimeState {
 pub(crate) struct TargetMotionState {
     pub position: Vec3,
     pub velocity: Vec3,
+    pub initialized: bool,
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource)]
 pub(crate) struct TargetHistory {
     pub entries: HashMap<Entity, TargetMotionState>,
+    /// Velocity smoothing decay rate. Higher = faster convergence, lower = smoother.
+    /// Applied as exponential smoothing: `v = lerp(v_old, v_raw, 1 - exp(-rate * dt))`.
+    pub velocity_smoothing_rate: f32,
+}
+
+impl Default for TargetHistory {
+    fn default() -> Self {
+        Self {
+            entries: HashMap::default(),
+            velocity_smoothing_rate: 12.0,
+        }
+    }
 }

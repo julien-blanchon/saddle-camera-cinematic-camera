@@ -146,6 +146,8 @@ fn setup(
             },
             CinematicPlayback::default(),
             overview_sequence.clone(),
+            // Output damping smooths entity tracking during priority handoffs.
+            CinematicOutputDamping::light(),
         ))
         .id();
 
@@ -161,11 +163,12 @@ fn setup(
             },
             CinematicPlayback::default(),
             close_sequence.clone(),
+            CinematicOutputDamping::light(),
         ))
         .id();
 
     commands.insert_resource(BrainCycle {
-        timer: Timer::from_seconds(3.5, TimerMode::Repeating),
+        timer: Timer::from_seconds(4.5, TimerMode::Repeating),
         active_index: 0,
         virtual_cameras: [overview, close],
     });

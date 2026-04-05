@@ -132,6 +132,8 @@ fn setup(
         },
         CinematicPlayback::default(),
         sequence.clone(),
+        // Output damping smooths entity-tracking jitter during blend transitions.
+        CinematicOutputDamping::default(),
     ));
     common::queue_example_pane(
         &mut commands,

@@ -100,7 +100,7 @@ fn setup(mut commands: Commands) {
 | Type | Purpose |
 | --- | --- |
 | `CinematicCameraPlugin` | Registers the cinematic runtime with injectable activate, deactivate, and update schedules |
-| `CinematicCameraSystems` | Public ordering hooks: `InputOrCommands`, `AdvanceTimeline`, `SolveRig`, `ApplyCamera`, `Debug` |
+| `CinematicCameraSystems` | Public ordering hooks: `InputOrCommands`, `AdvanceTimeline`, `SolveRig`, `CollisionAvoidance`, `ApplyCamera`, `Debug` |
 | `CinematicVirtualCamera` | Authoring-facing virtual-camera surface that syncs into rig/binding data |
 | `CinematicCameraBrain` | Optional marker for a gameplay camera that receives virtual-camera output |
 | `CinematicCameraRig` | Per-rig runtime toggle and optional autoplay flag |
@@ -113,6 +113,9 @@ fn setup(mut commands: Commands) {
 | `CinematicCameraState` | Solved camera output: transform, look target, FOV, current shot, and blend summary |
 | `CinematicDrivenCamera` | Ownership marker written to the bound camera while the crate drives it |
 | Messages | `CinematicPlaybackCommand`, `ShotStarted`, `ShotFinished`, `ShotMarkerReached`, `SequenceFinished`, `CinematicBlendCompleted` |
+| `CinematicOutputDamping` | Per-rig exponential smoothing on solved position and rotation to reduce jitter |
+| `CinematicCollisionAvoidance` | Per-rig camera collision avoidance via raycasting with configurable policy, padding, and retract/recover rates |
+| `CollisionPolicy` | Collision response strategy: `PushCloser` (default) or `None` |
 | Resources | `CinematicCameraDebugSettings`, `CinematicCameraDiagnostics` |
 
 ## Current Feature Scope
@@ -125,12 +128,15 @@ Supported in v0.1:
 - per-shot lens interpolation and additive deterministic handheld shake
 - overlapped shot blends plus gameplay-camera blend-in / blend-out
 - message-driven playback commands (`Play`, `Pause`, `Resume`, `Restart`, `Stop`, `Seek`)
+- per-rig output damping (`CinematicOutputDamping`) for framerate-independent exponential smoothing of solved pose
+- camera collision avoidance (`CinematicCollisionAvoidance`) via mesh raycasting with asymmetric retract/recover smoothing
+- exponentially smoothed target velocity estimation for stable look-ahead prediction
+- smooth virtual-camera handoff blending when the winning rig changes on a brain camera
 - runtime solved-state components and opt-in gizmo debugging via `CinematicCameraDebugSettings`
 
 Intentionally minimal in v0.1:
 
 - editor tooling and asset import pipelines
-- collision / occlusion avoidance
 - automatic dolly distance solve for group framing
 - orthographic lens blending
 - reverse-play lifecycle messages during ping-pong playback
@@ -142,8 +148,9 @@ The runtime is staged and orderable:
 1. `InputOrCommands`
 2. `AdvanceTimeline`
 3. `SolveRig`
-4. `ApplyCamera`
-5. `Debug`
+4. `CollisionAvoidance`
+5. `ApplyCamera`
+6. `Debug`
 
 Sequence data is cached on `Changed<CinematicSequence>`. The solver operates on the cache and writes a `CinematicCameraState` component before any camera mutation happens. `ApplyCamera` is the only stage that writes `Transform` and `Projection` on the bound camera entity.
 

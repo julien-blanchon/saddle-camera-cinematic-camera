@@ -1,3 +1,4 @@
+mod collision;
 mod components;
 mod config;
 mod curve;
@@ -7,11 +8,13 @@ mod resources;
 mod solver;
 mod systems;
 
+pub use collision::{CinematicCollisionAvoidance, CollisionPolicy};
 pub use components::{
     CinematicCameraBinding, CinematicCameraBrain, CinematicCameraRig, CinematicCameraState,
-    CinematicDrivenCamera, CinematicPlayback, CinematicPlaybackStatus, CinematicSequence,
-    CinematicShot, CinematicTargetGroup, CinematicVirtualCamera, LensTrack, LookAtTarget,
-    OrientationTrack, PathTangentOrientation, PositionTrack, RailTrack, WeightedTarget,
+    CinematicDrivenCamera, CinematicOutputDamping, CinematicPlayback, CinematicPlaybackStatus,
+    CinematicSequence, CinematicShot, CinematicTargetGroup, CinematicVirtualCamera, LensTrack,
+    LookAtTarget, OrientationTrack, PathTangentOrientation, PositionTrack, RailTrack,
+    WeightedTarget,
 };
 pub use config::{
     CinematicBlend, CinematicEasing, MarkerTime, PlaybackLoopMode, ProceduralShake, ShotMarker,
@@ -37,6 +40,7 @@ pub enum CinematicCameraSystems {
     InputOrCommands,
     AdvanceTimeline,
     SolveRig,
+    CollisionAvoidance,
     ApplyCamera,
     Debug,
 }
@@ -99,6 +103,9 @@ impl Plugin for CinematicCameraPlugin {
             .register_type::<CinematicCameraState>()
             .register_type::<CinematicVirtualCamera>()
             .register_type::<CinematicDrivenCamera>()
+            .register_type::<CinematicOutputDamping>()
+            .register_type::<CinematicCollisionAvoidance>()
+            .register_type::<CollisionPolicy>()
             .register_type::<CinematicEasing>()
             .register_type::<CinematicPlayback>()
             .register_type::<CinematicPlaybackStatus>()
@@ -129,6 +136,7 @@ impl Plugin for CinematicCameraPlugin {
                     CinematicCameraSystems::InputOrCommands,
                     CinematicCameraSystems::AdvanceTimeline,
                     CinematicCameraSystems::SolveRig,
+                    CinematicCameraSystems::CollisionAvoidance,
                     CinematicCameraSystems::ApplyCamera,
                     CinematicCameraSystems::Debug,
                 )
@@ -149,12 +157,25 @@ impl Plugin for CinematicCameraPlugin {
                         .in_set(CinematicCameraSystems::InputOrCommands),
                     systems::advance_timeline.in_set(CinematicCameraSystems::AdvanceTimeline),
                     systems::solve_rigs.in_set(CinematicCameraSystems::SolveRig),
+                    collision::ensure_collision_state
+                        .in_set(CinematicCameraSystems::CollisionAvoidance),
                     (systems::apply_camera_bindings, systems::publish_diagnostics)
                         .chain()
                         .in_set(CinematicCameraSystems::ApplyCamera),
                 )
                     .run_if(systems::runtime_is_active),
             );
+
+        // Collision avoidance uses MeshRayCast which requires the mesh picking plugin.
+        if app.is_plugin_added::<bevy::prelude::MeshPickingPlugin>() {
+            app.add_systems(
+                self.update_schedule,
+                collision::apply_collision_avoidance
+                    .in_set(CinematicCameraSystems::CollisionAvoidance)
+                    .after(collision::ensure_collision_state)
+                    .run_if(systems::runtime_is_active),
+            );
+        }
 
         if app.is_plugin_added::<bevy::gizmos::GizmoPlugin>() {
             app.add_systems(

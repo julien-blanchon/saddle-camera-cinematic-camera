@@ -309,6 +309,49 @@ impl CinematicPlayback {
     }
 }
 
+/// Configures optional output damping on the solved camera pose.
+/// This smooths the final camera position/rotation to eliminate micro-jitter
+/// from noisy target tracking, velocity estimation, or blend transitions.
+///
+/// Inspired by Unity Cinemachine's damping system.
+#[derive(Component, Clone, Copy, Debug, Reflect)]
+#[reflect(Component)]
+pub struct CinematicOutputDamping {
+    /// Positional damping rate. Higher = faster convergence, lower = smoother.
+    /// Set to 0.0 to disable position damping.
+    pub position_rate: f32,
+    /// Rotational damping rate. Higher = faster convergence, lower = smoother.
+    /// Set to 0.0 to disable rotation damping.
+    pub rotation_rate: f32,
+}
+
+impl Default for CinematicOutputDamping {
+    fn default() -> Self {
+        Self {
+            position_rate: 20.0,
+            rotation_rate: 15.0,
+        }
+    }
+}
+
+impl CinematicOutputDamping {
+    /// Light damping — minimal smoothing for subtle jitter removal.
+    pub fn light() -> Self {
+        Self {
+            position_rate: 30.0,
+            rotation_rate: 25.0,
+        }
+    }
+
+    /// Heavy damping — strong smoothing for very noisy tracking scenarios.
+    pub fn heavy() -> Self {
+        Self {
+            position_rate: 8.0,
+            rotation_rate: 6.0,
+        }
+    }
+}
+
 #[derive(Component, Clone, Copy, Debug, Reflect)]
 #[reflect(Component)]
 pub struct CinematicDrivenCamera {

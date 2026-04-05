@@ -6,10 +6,11 @@ use bevy::{
 use crate::{
     CinematicBlendCompleted, CinematicBlendKind, CinematicCameraBinding,
     CinematicCameraDiagnostics, CinematicCameraRig, CinematicCameraState, CinematicDrivenCamera,
-    CinematicPlayback, CinematicPlaybackCommand, CinematicPlaybackStatus, CinematicSequence,
-    CinematicShot, CinematicTargetGroup, CinematicVirtualCamera, LookAtTarget, OrientationTrack,
-    PathTangentOrientation, PlaybackLoopMode, PositionTrack, SequenceFinished, ShotFinished,
-    ShotMarkerReached, ShotStarted, UpVectorMode,
+    CinematicEasing, CinematicOutputDamping, CinematicPlayback, CinematicPlaybackCommand,
+    CinematicPlaybackStatus, CinematicSequence, CinematicShot, CinematicTargetGroup,
+    CinematicVirtualCamera, LookAtTarget, OrientationTrack, PathTangentOrientation,
+    PlaybackLoopMode, PositionTrack, SequenceFinished, ShotFinished, ShotMarkerReached,
+    ShotStarted, UpVectorMode,
     curve::CinematicRailCache,
     resources::{CinematicCameraRuntimeState, TargetHistory, TargetMotionState},
     solver::{self, SolvedCameraPose},
@@ -67,6 +68,15 @@ struct CameraSnapshot {
 }
 
 type CameraBindingWinner = (Entity, i32, CinematicCameraState, bool, bool, bool);
+
+/// Tracks the previous winning rig per camera for smooth handoff transitions.
+#[derive(Default)]
+pub(crate) struct CameraHandoffState {
+    previous_owner: Option<Entity>,
+    blend_elapsed: f32,
+    blend_duration: f32,
+    snapshot_pose: Option<SolvedCameraPose>,
+}
 
 impl CameraSnapshot {
     fn from_camera(transform: &Transform, projection: Option<&Projection>) -> Self {
@@ -292,15 +302,28 @@ pub(crate) fn refresh_target_history(
         return;
     }
 
+    let smoothing_rate = history.velocity_smoothing_rate;
     for (entity, transform) in &query {
         let position = transform.translation();
         let entry = history.entries.entry(entity).or_default();
-        let velocity = if entry.position == Vec3::ZERO && entry.velocity == Vec3::ZERO {
-            Vec3::ZERO
+        if !entry.initialized {
+            // First observation — record position but no velocity yet.
+            *entry = TargetMotionState {
+                position,
+                velocity: Vec3::ZERO,
+                initialized: true,
+            };
         } else {
-            (position - entry.position) / delta
-        };
-        *entry = TargetMotionState { position, velocity };
+            let raw_velocity = (position - entry.position) / delta;
+            // Framerate-independent exponential smoothing: factor = 1 - e^(-rate * dt)
+            let factor = (1.0 - (-smoothing_rate * delta).exp()).clamp(0.0, 1.0);
+            let smoothed = entry.velocity.lerp(raw_velocity, factor);
+            *entry = TargetMotionState {
+                position,
+                velocity: smoothed,
+                initialized: true,
+            };
+        }
     }
 }
 
@@ -552,6 +575,7 @@ pub(crate) fn advance_timeline(
 }
 
 pub(crate) fn solve_rigs(
+    time: Res<Time>,
     transforms: Query<&GlobalTransform>,
     target_groups: Query<&CinematicTargetGroup>,
     history: Res<TargetHistory>,
@@ -563,10 +587,12 @@ pub(crate) fn solve_rigs(
         &CinematicPlayback,
         &mut CinematicRuntime,
         &mut CinematicCameraState,
+        Option<&CinematicOutputDamping>,
     )>,
     mut blend_completed: MessageWriter<CinematicBlendCompleted>,
 ) {
-    for (entity, rig, sequence, cache, playback, mut runtime, mut state) in &mut rigs {
+    let delta = time.delta_secs();
+    for (entity, rig, sequence, cache, playback, mut runtime, mut state, damping) in &mut rigs {
         if sequence.shots.is_empty() {
             *state = CinematicCameraState::default();
             continue;
@@ -648,6 +674,24 @@ pub(crate) fn solve_rigs(
             });
         }
 
+        // Apply optional output damping (exponential smoothing on position/rotation).
+        if let Some(damping) = damping {
+            if delta > f32::EPSILON && state.active {
+                if damping.position_rate > 0.0 {
+                    let factor: f32 =
+                        (1.0_f32 - (-damping.position_rate * delta).exp()).clamp(0.0, 1.0);
+                    pose.translation = state.translation.lerp(pose.translation, factor);
+                    pose.look_target = state.look_target.lerp(pose.look_target, factor);
+                    pose.fov_y_radians = state.fov_y_radians.lerp(pose.fov_y_radians, factor);
+                }
+                if damping.rotation_rate > 0.0 {
+                    let factor: f32 =
+                        (1.0_f32 - (-damping.rotation_rate * delta).exp()).clamp(0.0, 1.0);
+                    pose.rotation = state.rotation.slerp(pose.rotation, factor);
+                }
+            }
+        }
+
         state.active = rig.enabled && (playback.is_active() || playback.elapsed_secs > 0.0);
         state.translation = pose.translation;
         state.rotation = pose.rotation;
@@ -662,6 +706,7 @@ pub(crate) fn solve_rigs(
 }
 
 pub(crate) fn apply_camera_bindings(
+    time: Res<Time>,
     mut commands: Commands,
     rigs: Query<(
         Entity,
@@ -672,7 +717,9 @@ pub(crate) fn apply_camera_bindings(
     mut cameras: Query<(Entity, &mut Transform, Option<&mut Projection>)>,
     driven: Query<(Entity, &CinematicDrivenCamera)>,
     mut winners: Local<std::collections::HashMap<Entity, CameraBindingWinner>>,
+    mut handoffs: Local<std::collections::HashMap<Entity, CameraHandoffState>>,
 ) {
+    let delta = time.delta_secs();
     winners.clear();
 
     for (rig_entity, binding, playback, state) in &rigs {
@@ -719,14 +766,63 @@ pub(crate) fn apply_camera_bindings(
     {
         if let Ok((_entity, mut transform, projection)) = cameras.get_mut(camera_entity) {
             if should_apply {
+                let handoff = handoffs.entry(camera_entity).or_default();
+
+                // Detect owner change → start a smooth handoff blend.
+                if handoff.previous_owner != Some(owner) {
+                    if handoff.previous_owner.is_some() {
+                        // Capture the current camera transform as the blend source.
+                        handoff.snapshot_pose = Some(SolvedCameraPose {
+                            translation: transform.translation,
+                            rotation: transform.rotation,
+                            look_target: transform.translation
+                                + transform.forward().as_vec3() * 10.0,
+                            fov_y_radians: projection
+                                .as_deref()
+                                .and_then(|p| match p {
+                                    Projection::Perspective(pp) => Some(pp.fov),
+                                    _ => None,
+                                })
+                                .unwrap_or(state.fov_y_radians),
+                        });
+                        handoff.blend_elapsed = 0.0;
+                        // Default handoff duration — 0.3s smooth transition.
+                        handoff.blend_duration = 0.3;
+                    }
+                    handoff.previous_owner = Some(owner);
+                }
+
+                // Advance handoff blend.
+                let mut final_translation = state.translation;
+                let mut final_rotation = state.rotation;
+                let mut final_fov = state.fov_y_radians;
+
+                if let Some(snapshot) = &handoff.snapshot_pose {
+                    handoff.blend_elapsed += delta;
+                    if handoff.blend_elapsed < handoff.blend_duration {
+                        let alpha = CinematicEasing::SineInOut
+                            .sample(handoff.blend_elapsed / handoff.blend_duration);
+                        let blended = solver::blend_pose(
+                            snapshot,
+                            &SolvedCameraPose::from_state(&state),
+                            alpha,
+                        );
+                        final_translation = blended.translation;
+                        final_rotation = blended.rotation;
+                        final_fov = blended.fov_y_radians;
+                    } else {
+                        handoff.snapshot_pose = None;
+                    }
+                }
+
                 if apply_transform {
-                    *transform = Transform::from_translation(state.translation)
-                        .with_rotation(state.rotation);
+                    *transform = Transform::from_translation(final_translation)
+                        .with_rotation(final_rotation);
                 }
                 if apply_projection {
                     if let Some(mut projection) = projection {
                         if let Projection::Perspective(perspective) = projection.as_mut() {
-                            perspective.fov = state.fov_y_radians.max(0.001);
+                            perspective.fov = final_fov.max(0.001);
                         }
                     }
                 }
@@ -910,8 +1006,14 @@ fn active_blend(
 
         let start = cache.shot_starts[index];
         let end = start + blend;
-        if (start..end).contains(&time_secs) {
-            let alpha = sequence.shots[index].blend_in.alpha(time_secs - start);
+        // Use inclusive end with small epsilon to avoid discontinuity at the blend boundary.
+        // Without this, the frame where time_secs == end would suddenly switch from the
+        // blended pose to the single-shot pose, causing a visible pop.
+        if time_secs >= start && time_secs < end + 0.0001 {
+            let alpha = sequence.shots[index]
+                .blend_in
+                .alpha(time_secs - start)
+                .clamp(0.0, 1.0);
             return Some((index - 1, index, alpha));
         }
     }

@@ -331,7 +331,7 @@ pub fn spawn_target_group(
                 members,
                 fallback_point,
                 up: UpVectorMode::WorldY,
-                look_ahead_secs: 0.25,
+                look_ahead_secs: 0.12,
             },
         ))
         .id()
@@ -371,7 +371,7 @@ fn update_overlay(
         .next()
         .map(|(name, playback, state)| {
             format!(
-                "{}\nrig: {}\nstatus: {:?}\nsequence time: {:.2}s\ncurrent shot: {:?}\nblend: {:?} -> {:?} ({:.2})\nactive rigs: {}\napplied cameras: {}\ntarget cache: {}",
+                "{}\n\nrig: {}\nstatus: {:?}\nsequence time: {:.2}s\ncurrent shot: {:?}\nblend: {:?} -> {:?} ({:.2})\nactive rigs: {}\napplied cameras: {}\ntarget cache: {}\n\n[Pane: top-right] Adjust playback speed, blends, debug viz",
                 title.0,
                 name.as_str(),
                 playback.status,
