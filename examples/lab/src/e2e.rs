@@ -96,6 +96,32 @@ fn handles(world: &World) -> LabHandles {
     }
 }
 
+fn write_playback_command(
+    world: &mut World,
+    build_command: impl FnOnce(Entity) -> CinematicPlaybackCommand,
+) {
+    let rig = handles(world).rig;
+    world
+        .resource_mut::<Messages<CinematicPlaybackCommand>>()
+        .write(build_command(rig));
+}
+
+fn restart_sequence(world: &mut World) {
+    write_playback_command(world, |rig| CinematicPlaybackCommand::Restart(rig));
+}
+
+fn pause_sequence(world: &mut World) {
+    write_playback_command(world, |rig| CinematicPlaybackCommand::Pause(rig));
+}
+
+fn resume_sequence(world: &mut World) {
+    write_playback_command(world, |rig| CinematicPlaybackCommand::Resume(rig));
+}
+
+fn seek_sequence(world: &mut World, seconds: f32) {
+    write_playback_command(world, |rig| CinematicPlaybackCommand::SeekSeconds { rig, seconds });
+}
+
 fn build_smoke_launch() -> Scenario {
     Scenario::builder("smoke_launch")
         .description("Boot the cinematic lab, verify the virtual-camera authoring path is present, and capture a baseline screenshot.")
@@ -176,12 +202,7 @@ fn build_playback_commands() -> Scenario {
         .then(Action::Screenshot("cinematic_camera_playback_commands_playing".into()))
         .then(Action::WaitFrames(1))
         // Send Pause command.
-        .then(Action::Custom(Box::new(|world: &mut World| {
-            let rig = handles(world).rig;
-            world
-                .resource_mut::<Messages<CinematicPlaybackCommand>>()
-                .write(CinematicPlaybackCommand::Pause(rig));
-        })))
+        .then(Action::Custom(Box::new(pause_sequence)))
         .then(Action::WaitFrames(4))
         .then(assertions::component_satisfies::<CinematicPlayback>(
             "status becomes Paused",
@@ -202,12 +223,7 @@ fn build_playback_commands() -> Scenario {
         .then(Action::Screenshot("cinematic_camera_playback_commands_paused".into()))
         .then(Action::WaitFrames(1))
         // Send Resume command.
-        .then(Action::Custom(Box::new(|world: &mut World| {
-            let rig = handles(world).rig;
-            world
-                .resource_mut::<Messages<CinematicPlaybackCommand>>()
-                .write(CinematicPlaybackCommand::Resume(rig));
-        })))
+        .then(Action::Custom(Box::new(resume_sequence)))
         .then(Action::WaitFrames(8))
         .then(assertions::component_satisfies::<CinematicPlayback>(
             "status becomes Playing again",
@@ -242,12 +258,7 @@ fn build_shot_transitions() -> Scenario {
         )
         .then(Action::WaitFrames(30))
         // Restart so the timeline is deterministic from frame 0.
-        .then(Action::Custom(Box::new(|world: &mut World| {
-            let rig = handles(world).rig;
-            world
-                .resource_mut::<Messages<CinematicPlaybackCommand>>()
-                .write(CinematicPlaybackCommand::Restart(rig));
-        })))
+        .then(Action::Custom(Box::new(restart_sequence)))
         .then(Action::WaitFrames(4))
         .then(assertions::component_satisfies::<CinematicPlayback>(
             "playback restarted at time zero",
@@ -296,12 +307,7 @@ fn build_seek() -> Scenario {
         )
         .then(Action::WaitFrames(30))
         // Restart to a known baseline position.
-        .then(Action::Custom(Box::new(|world: &mut World| {
-            let rig = handles(world).rig;
-            world
-                .resource_mut::<Messages<CinematicPlaybackCommand>>()
-                .write(CinematicPlaybackCommand::Restart(rig));
-        })))
+        .then(Action::Custom(Box::new(restart_sequence)))
         .then(Action::WaitFrames(4))
         // Capture baseline position right after restart.
         .then(Action::Custom(Box::new(|world: &mut World| {
@@ -316,10 +322,7 @@ fn build_seek() -> Scenario {
         .then(Action::WaitFrames(1))
         // Seek to 3.5 s — well into the "Push" rail shot (starts ~1.8 s).
         .then(Action::Custom(Box::new(|world: &mut World| {
-            let rig = handles(world).rig;
-            world
-                .resource_mut::<Messages<CinematicPlaybackCommand>>()
-                .write(CinematicPlaybackCommand::SeekSeconds { rig, seconds: 3.5 });
+            seek_sequence(world, 3.5);
         })))
         .then(Action::WaitFrames(4))
         .then(assertions::custom(
@@ -362,12 +365,7 @@ fn build_moving_target() -> Scenario {
         )
         .then(Action::WaitFrames(30))
         // Restart so the sequence is deterministic from frame 0.
-        .then(Action::Custom(Box::new(|world: &mut World| {
-            let rig = handles(world).rig;
-            world
-                .resource_mut::<Messages<CinematicPlaybackCommand>>()
-                .write(CinematicPlaybackCommand::Restart(rig));
-        })))
+        .then(Action::Custom(Box::new(restart_sequence)))
         .then(Action::WaitFrames(4))
         // Record the initial camera position.
         .then(Action::Custom(Box::new(|world: &mut World| {
@@ -426,12 +424,7 @@ fn build_target_group() -> Scenario {
              boundary and confirming the translation changed.",
         )
         .then(Action::WaitFrames(30))
-        .then(Action::Custom(Box::new(|world: &mut World| {
-            let rig = handles(world).rig;
-            world
-                .resource_mut::<Messages<CinematicPlaybackCommand>>()
-                .write(CinematicPlaybackCommand::Restart(rig));
-        })))
+        .then(Action::Custom(Box::new(restart_sequence)))
         .then(Action::WaitFrames(4))
         .then(assertions::custom(
             "brain is driven by the rig at sequence start",
@@ -493,19 +486,11 @@ fn build_handheld_rail() -> Scenario {
              and the camera translation is finite throughout.",
         )
         .then(Action::WaitFrames(30))
-        .then(Action::Custom(Box::new(|world: &mut World| {
-            let rig = handles(world).rig;
-            world
-                .resource_mut::<Messages<CinematicPlaybackCommand>>()
-                .write(CinematicPlaybackCommand::Restart(rig));
-        })))
+        .then(Action::Custom(Box::new(restart_sequence)))
         .then(Action::WaitFrames(4))
         // Seek to the start of the Push rail shot.
         .then(Action::Custom(Box::new(|world: &mut World| {
-            let rig = handles(world).rig;
-            world
-                .resource_mut::<Messages<CinematicPlaybackCommand>>()
-                .write(CinematicPlaybackCommand::SeekSeconds { rig, seconds: 1.9 });
+            seek_sequence(world, 1.9);
         })))
         .then(Action::WaitFrames(4))
         .then(assertions::custom(
